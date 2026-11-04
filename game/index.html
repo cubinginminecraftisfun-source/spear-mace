@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minecraft Practice Arena</title>
+<style>
+:root{--panel:rgba(18,22,27,.92);--line:rgba(255,255,255,.18);--muted:#cbd5e1}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87b9e8;font-family:system-ui,Segoe UI,Arial,sans-serif;color:white}
+#game{position:absolute;inset:0}
+canvas{display:block;width:100%;height:100%}
+#topbar{position:absolute;top:12px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 4px 18px #0003}
+#stats{min-width:190px}
+#healthOuter{height:12px;background:#4b2020;border-radius:8px;overflow:hidden;margin-top:6px}
+#health{height:100%;width:100%;background:#e34b4b;transition:width .15s}
+#hint{font-size:12px;color:#e2e8f0;line-height:1.5;text-align:right}
+#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 1px 3px #000}
+#crosshair:before{width:2px;height:16px;left:8px;top:1px}
+#crosshair:after{height:2px;width:16px;left:1px;top:8px}
+#hotbar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:4px;padding:6px;background:#171717d9;border:2px solid #777;border-radius:7px;max-width:calc(100vw - 16px)}
+.slot{width:54px;height:54px;border:2px solid #777;background:#555b;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border-radius:3px;flex-shrink:0}
+.slot.selected{border:3px solid #fff;background:#999b;outline:2px solid #222}
+.slot .num{position:absolute;top:1px;left:4px;font-size:10px;color:#ddd}
+.slot .emoji{font-size:25px;line-height:28px}
+.slot .name{font-size:8px;color:#fff;white-space:nowrap}
+#toast{position:absolute;top:22%;left:50%;transform:translateX(-50%);background:#111d;padding:8px 14px;border-radius:7px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+#centerMenu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0007}
+.menuCard{width:min(440px,calc(100vw - 28px));background:#18212b;border:1px solid #ffffff35;border-radius:14px;padding:22px;box-shadow:0 18px 60px #0008}
+.menuCard h2{margin:0 0 8px}.menuCard p{color:#cbd5e1;font-size:14px;line-height:1.5}
+button{background:#4b8c45;border:0;color:white;padding:10px 14px;border-radius:7px;font-weight:700;cursor:pointer}
+button.secondary{background:#475569}
+.menuActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+#settings{display:none;position:absolute;inset:0;background:#0009;align-items:center;justify-content:center}
+#settings .menuCard{max-height:90%;overflow:auto}
+.bindRow{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;margin:8px 0;font-size:14px}
+.bindRow button{background:#475569}
+#targetInfo{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);font-size:12px;background:#111b;padding:5px 9px;border-radius:5px;white-space:nowrap}
+@media(max-width:600px){.slot{width:37px;height:44px}.slot .emoji{font-size:19px}.slot .name{font-size:7px}#hint{display:none}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="topbar">
+  <div id="stats" class="panel"><strong>Health <span id="healthText">20 / 20</span></strong><div id="healthOuter"><div id="health"></div></div><div style="font-size:11px;color:#cbd5e1;margin-top:5px">Arena practice · No hunger</div></div>
+  <div id="hint" class="panel">WASD move · Space jump · Shift sprint<br>1–9 select · Scroll switch · Left click use · R respawn · Esc release</div>
+</div>
+<div id="crosshair"></div>
+<div id="toast"></div>
+<div id="targetInfo">Aim at a box target and use an item</div>
+<div id="hotbar"></div>
+
+<div id="centerMenu">
+ <div class="menuCard">
+  <h2>Practice Arena</h2>
+  <p>First-person block-world movement practice. Click below to enter the arena and capture your mouse. Use WASD to move, Space to jump, and the number keys to select items.</p>
+  <div class="menuActions">
+   <button id="enterBtn">Enter arena</button>
+   <button class="secondary" id="openSettings">Controls</button>
+  </div>
+ </div>
+</div>
+
+<div id="settings">
+ <div class="menuCard">
+  <h2>Controls</h2>
+  <p>Choose an action, then press the key you want to assign. Number keys 1–9 remain reserved for hotbar selection.</p>
+  <div id="bindRows"></div>
+  <div class="menuActions">
+   <button id="resetBinds" class="secondary">Reset defaults</button>
+   <button id="closeSettings">Close</button>
+  </div>
+ </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const gameEl=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87b9e8);
+scene.fog=new THREE.Fog(0x87b9e8,34,95);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,180);
+camera.rotation.order='YXZ';
+const renderer=new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+gameEl.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xddeeff,0x64734c,2.0));
+const sun=new THREE.DirectionalLight(0xffffff,2.0);
+sun.position.set(-25,40,20);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+
+const materials={
+ grass:new THREE.MeshStandardMaterial({color:0x69a84b}),
+ dirt:new THREE.MeshStandardMaterial({color:0x795333}),
+ stone:new THREE.MeshStandardMaterial({color:0x858585}),
+ wood:new THREE.MeshStandardMaterial({color:0x986536}),
+ target:new THREE.MeshStandardMaterial({color:0xe3a52c}),
+ targetHit:new THREE.MeshStandardMaterial({color:0x62c77b}),
+ white:new THREE.MeshStandardMaterial({color:0xe8e8e8})
+};
+const cubeGeo=new THREE.BoxGeometry(1,1,1);
+function block(x,y,z,mat=materials.grass,sx=1,sy=1,sz=1){
+ const m=new THREE.Mesh(cubeGeo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;
+}
+// Arena floor and simple block-built boundaries.
+for(let x=-24;x<=24;x++)for(let z=-24;z<=24;z++)block(x,-.5,z,((x+z)%2===0)?materials.grass:materials.dirt,1,1,1);
+for(let i=-24;i<=24;i++){block(i,1,-25,materials.stone);block(i,1,25,materials.stone);block(-25,1,i,materials.stone);block(25,1,i,materials.stone);}
+for(let x=-10;x<=10;x+=5){block(x,1,-10,materials.wood,3,2,1);block(x,1,10,materials.wood,3,2,1);}
+for(let z=-8;z<=8;z+=4){block(-13,1,z,materials.stone,1,2,3);block(13,1,z,materials.stone,1,2,3);}
+for(let x=-9;x<=9;x+=3){block(x,2,-16,materials.stone,2,1,2);block(x,2,16,materials.stone,2,1,2);}
+
+const targets=[];
+function makeTarget(x,y,z){
+ const group=new THREE.Group();group.position.set(x,y,z);
+ const base=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),materials.target);base.castShadow=true;group.add(base);
+ const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.13,.12,1.13),materials.white);stripe.position.y=.12;group.add(stripe);
+ scene.add(group);targets.push({group,base,hits:0,active:true,respawnAt:0});
+}
+[[-7,1.5,-5],[-3,1.5,-7],[2,1.5,-6],[7,1.5,-4],[-8,1.5,5],[-2,1.5,7],[4,1.5,6],[9,1.5,7],[0,3.5,-14]].forEach(p=>makeTarget(...p));
+
+// Raised platforms and stairs for jumping/fall-damage practice.
+for(let i=0;i<5;i++)block(-17+i*2,0.5+i*.55,0,materials.stone,2,1,3);
+block(17,1.5,0,materials.wood,5,3,5);
+block(17,3.5,0,materials.stone,3,1,3);
+
+const player={pos:new THREE.Vector3(0,2.01,18),vel:new THREE.Vector3(),yaw:0,pitch:0,onGround:false,health:20,lastGroundY:2,fallStartY:2,invuln:0};
+const PLAYER_HEIGHT=1.8, RADIUS=.32, EYE_HEIGHT=1.62;
+let selected=0,locked=false,paused=true,toastTimer=0;
+const keys={};
+const slots=[
+ ['🪓','Axe'],['💨','Wind charge'],['🔨','Mace'],['🟣','Ender pearl'],['🥩','Steak'],['🛡️','Shield'],['🔱','Spear'],['⚔️','Sword'],['🍎','Golden apple']
+];
+const hotbar=document.getElementById('hotbar');
+function drawHotbar(){hotbar.innerHTML='';slots.forEach((s,i)=>{const el=document.createElement('div');el.className='slot'+(i===selected?' selected':'');el.innerHTML=`<span class="num">${i+1}</span><span class="emoji">${s[0]}</span><span class="name">${s[1]}</span>`;hotbar.appendChild(el);});}
+drawHotbar();
+function say(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity=1;toastTimer=1.6;}
+function updateHealth(){document.getElementById('health').style.width=(player.health/20*100)+'%';document.getElementById('healthText').textContent=player.health+' / 20';}
+function respawn(){player.pos.set(0,2.01,18);player.vel.set(0,0,0);player.health=20;player.onGround=false;player.fallStartY=2;updateHealth();say('Respawned');}
+function damage(amount,label){if(player.invuln>0)return;player.health=Math.max(0,player.health-amount);player.invuln=.65;updateHealth();say(label+' −'+amount+' HP');if(player.health<=0){respawn();say('Respawned instantly');}}
+function setSelected(i){selected=(i+9)%9;drawHotbar();say(slots[selected][1]);}
+
+const defaults={forward:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',jump:'Space',sprint:'ShiftLeft',use:'Mouse0',respawn:'KeyR'};
+let binds={...defaults};
+try{const saved=JSON.parse(localStorage.getItem('practiceBinds')||'null');if(saved)binds={...defaults,...saved};}catch{}
+const labels={forward:'Move forward',back:'Move backward',left:'Move left',right:'Move right',jump:'Jump',sprint:'Sprint',use:'Use item',respawn:'Respawn'};
+function pretty(code){if(code==='Mouse0')return 'Left mouse';return code.replace('Key','').replace('ShiftLeft','Left Shift').replace('ShiftRight','Right Shift').replace('Arrow','Arrow ');}
+function saveBinds(){localStorage.setItem('practiceBinds',JSON.stringify(binds));}
+let waitingBind=null;
+function renderBindRows(){const root=document.getElementById('bindRows');root.innerHTML='';Object.keys(labels).forEach(k=>{const row=document.createElement('div');row.className='bindRow';const label=document.createElement('span');label.textContent=labels[k];const b=document.createElement('button');b.textContent=waitingBind===k?'Press a key…':pretty(binds[k]);b.onclick=()=>{waitingBind=k;renderBindRows();};row.append(label,b);root.append(row);});}
+function openSettings(){document.getElementById('settings').style.display='flex';renderBindRows();document.exitPointerLock?.();}
+document.getElementById('openSettings').onclick=openSettings;
+document.getElementById('closeSettings').onclick=()=>{document.getElementById('settings').style.display='none';};
+document.getElementById('resetBinds').onclick=()=>{binds={...defaults};saveBinds();waitingBind=null;renderBindRows();};
+document.getElementById('enterBtn').onclick=()=>{document.getElementById('centerMenu').style.display='none';renderer.domElement.requestPointerLock();};
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;paused=!locked;document.getElementById('centerMenu').style.display=locked?'none':'flex';});
+document.addEventListener('mousemove',e=>{if(!locked)return;player.yaw-=e.movementX*.0022;player.pitch-=e.movementY*.0022;player.pitch=Math.max(-1.52,Math.min(1.52,player.pitch));});
+document.addEventListener('keydown',e=>{
+ if(waitingBind){if(waitingBind==='use')return;if(e.code.startsWith('Digit')||e.code.startsWith('Numpad')){say('Number keys are reserved for hotbar slots');return;}binds[waitingBind]=e.code;waitingBind=null;saveBinds();renderBindRows();return;}
+ keys[e.code]=true;
+ if(/^Digit[1-9]$/.test(e.code))setSelected(Number(e.code.slice(-1))-1);
+ if(e.code==='KeyR')respawn();
+ if(e.code==='Escape'&&document.getElementById('settings').style.display==='flex')document.getElementById('settings').style.display='none';
+});
+document.addEventListener('keyup',e=>keys[e.code]=false);
+document.addEventListener('mousedown',e=>{
+ if(waitingBind==='use'){binds.use=e.button===0?'Mouse0':(e.button===2?'Mouse2':'Mouse'+e.button);waitingBind=null;saveBinds();renderBindRows();e.preventDefault();return;}
+ if(e.button===0&&locked)useItem();
+});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('wheel',e=>{if(locked)setSelected(selected+(e.deltaY>0?1:-1));},{passive:true});
+
+const raycaster=new THREE.Raycaster();
+function forwardVector(){return new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));}
+function useItem(){
+ if(selected===4){say('Steak selected · decorative food');return;}
+ if(selected===8){player.health=Math.min(20,player.health+4);updateHealth();say('Golden apple · +4 HP');return;}
+ if(selected===5){player.invuln=Math.max(player.invuln,1.2);say('Shield stance · brief protection');return;}
+ raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+ const meshes=targets.filter(t=>t.active).map(t=>t.base);
+ const hit=raycaster.intersectObjects(meshes,false)[0];
+ if(hit&&hit.distance<6){
+   const target=targets.find(t=>t.base===hit.object);
+   if(target){target.hits++;target.base.material=materials.targetHit;target.respawnAt=performance.now()+800;target.active=false;say('Target hit · '+target.hits+' total');}
+ }else{
+   const names=['Axe','Wind charge','Mace','Ender pearl','Steak','Shield','Spear','Sword','Golden apple'];
+   if(selected===1){
+     // A stylized game impulse: a short, bounded player hop with a visible particle burst.
+     player.vel.y=Math.max(player.vel.y,7.2);
+     const f=forwardVector();player.vel.addScaledVector(f,-3.0);
+     burst(camera.position.clone().add(f.clone().multiplyScalar(1.2)),0x8de7ff);
+     say('Wind burst · momentum changed');
+   }else if(selected===3){
+     // Short-range arcade blink to a clear point in front of the player.
+     const f=forwardVector();const destination=player.pos.clone().addScaledVector(f,5);
+     destination.y=Math.max(1.01,player.pos.y);
+     player.pos.copy(destination);player.vel.multiplyScalar(.35);burst(player.pos.clone(),0xb47cff);say('Pearl blink');
+   }else if(selected===2||selected===6||selected===7||selected===0){
+     burst(camera.position.clone().add(forwardVector().multiplyScalar(2)),0xffd27a);
+     say(names[selected]+' · practice swing');
+   }else say(names[selected]);
+ }
+}
+const particles=[];
+function burst(pos,color){for(let i=0;i<12;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.09,.09,.09),new THREE.MeshBasicMaterial({color}));m.position.copy(pos);scene.add(m);particles.push({m,v:new THREE.Vector3((Math.random()-.5)*5,Math.random()*4,(Math.random()-.5)*5),life:.45});}}
+function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.m.position.addScaledVector(p.v,dt);p.v.y-=8*dt;if(p.life<=0){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();particles.splice(i,1);}}}
+
+function groundHeight(x,z){
+ // Collision approximation for the flat arena and raised practice structures.
+ let h=0;
+ if(x>-18&&x<-8&&z>-1.6&&z<1.6){const idx=Math.max(0,Math.min(4,Math.floor((x+18)/2)));h=Math.max(h,.55+idx*.55);}
+ if(x>14.5&&x<19.5&&z>-2.5&&z<2.5)h=Math.max(h,3);
+ return h;
+}
+function blocked(x,z){return Math.abs(x)>24.4||Math.abs(z)>24.4;}
+function updatePlayer(dt){
+ const f=forwardVector(),right=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
+ let wish=new THREE.Vector3();
+ if(keys[binds.forward])wish.add(f);
+ if(keys[binds.back])wish.sub(f);
+ if(keys[binds.right])wish.add(right);
+ if(keys[binds.left])wish.sub(right);
+ if(wish.lengthSq()>0)wish.normalize();
+ const sprint=!!keys[binds.sprint],maxSpeed=sprint?7.0:4.35;
+ const accel=player.onGround?32:9;
+ player.vel.x+=wish.x*accel*dt;player.vel.z+=wish.z*accel*dt;
+ if(wish.lengthSq()===0&&player.onGround){const friction=Math.exp(-10*dt);player.vel.x*=friction;player.vel.z*=friction;}
+ const horizontal=Math.hypot(player.vel.x,player.vel.z);
+ if(horizontal>maxSpeed){player.vel.x*=maxSpeed/horizontal;player.vel.z*=maxSpeed/horizontal;}
+ if(keys[binds.jump]&&player.onGround){player.vel.y=8.2;player.onGround=false;player.fallStartY=player.pos.y;}
+ player.vel.y-=24*dt;
+ let nx=player.pos.x+player.vel.x*dt,nz=player.pos.z+player.vel.z*dt,ny=player.pos.y+player.vel.y*dt;
+ if(blocked(nx,player.pos.z)){nx=player.pos.x;player.vel.x=0;}
+ if(blocked(player.pos.x,nz)){nz=player.pos.z;player.vel.z=0;}
+ const floor=groundHeight(nx,nz)+1;
+ if(ny<=floor){if(!player.onGround&&player.fallStartY-floor>3.5){const drop=player.fallStartY-floor;damage(Math.max(1,Math.floor((drop-3)*1.5)),'Fall damage');}
+ ny=floor;player.vel.y=0;player.onGround=true;player.fallStartY=ny;
+ }else{if(player.onGround)player.fallStartY=player.pos.y;player.onGround=false;}
+ player.pos.set(nx,ny,nz);
+ if(player.pos.y<-20)respawn();
+ if(player.invuln>0)player.invuln-=dt;
+ camera.position.set(player.pos.x,player.pos.y+EYE_HEIGHT,player.pos.z);
+ camera.rotation.set(player.pitch,player.yaw,0,'YXZ');
+}
+function updateTargets(now){for(const t of targets){if(!t.active&&now>t.respawnAt){t.active=true;t.base.material=materials.target;t.group.visible=true;}}}
+const clock=new THREE.Clock();
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.04),now=performance.now();
+ if(!paused){updatePlayer(dt);updateTargets(now);updateParticles(dt);}
+ else updateParticles(dt);
+ if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)document.getElementById('toast').style.opacity=0;}
+ renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+updateHealth();
+</script>
+</body>
+</html>
