@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리집 플래너</title>
+<style>
+:root{
+  --bg:#f5f6f8;--panel:#fff;--ink:#20242b;--muted:#68717e;--line:#e3e7ed;
+  --blue:#2563eb;--blue-soft:#eff6ff;--green:#15803d;--red:#dc2626;
+  --shadow:0 3px 14px rgba(28,39,54,.07);--radius:15px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{max-width:1500px;margin:0 auto;padding:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:14px;background:#e8f0ff;display:grid;place-items:center;font-size:25px}
+h1{font-size:23px;margin:0 0 3px}
+.subtitle{color:var(--muted);font-size:13px}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:white;color:var(--ink);border-radius:10px;padding:10px 13px;font-weight:650;font-size:13px}
+.btn:hover{background:#f8fafc}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:white}
+.btn.primary:hover{background:#1d4ed8}
+.btn.danger{color:var(--red);border-color:#fecaca}
+.btn.small{padding:7px 9px;font-size:12px}
+.btn.active{background:var(--blue-soft);border-color:#93c5fd;color:#1d4ed8}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:15px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.editor{overflow:hidden}
+.toolbar{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolgroup{display:flex;gap:6px;flex-wrap:wrap}
+.tool-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:750;margin-right:2px;align-self:center}
+.canvas-wrap{padding:12px;background:#fbfcfe}
+#plan{display:block;width:100%;height:auto;min-height:480px;background-color:#fff;border:1px solid #e4e9f0;border-radius:12px;touch-action:none;cursor:crosshair}
+.canvas-foot{display:flex;justify-content:space-between;gap:10px;padding:10px 15px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+.side{display:flex;flex-direction:column;gap:13px}
+.card{padding:15px}
+.card h2{font-size:15px;margin:0 0 12px}
+.card h3{font-size:13px;margin:14px 0 8px}
+.field{display:flex;flex-direction:column;gap:5px;margin:9px 0}
+.field label{font-size:12px;font-weight:700;color:#4b5563}
+input,select,textarea{width:100%;border:1px solid #d9dee7;border-radius:9px;padding:9px 10px;background:white;color:var(--ink);outline:none}
+input:focus,select:focus,textarea:focus{border-color:#60a5fa;box-shadow:0 0 0 3px #dbeafe}
+textarea{resize:vertical;min-height:75px}
+.row{display:flex;gap:8px}
+.row>*{flex:1;min-width:0}
+.help{font-size:12px;color:var(--muted);line-height:1.5}
+.empty{padding:13px;border:1px dashed #d5dce6;border-radius:10px;color:var(--muted);font-size:12px;line-height:1.5}
+.object-list{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto}
+.object-item{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--line);border-radius:9px;font-size:12px}
+.object-item button{border:0;background:transparent;color:var(--muted);font-size:12px}
+.inventory{display:flex;gap:6px;margin:7px 0}
+.inventory input{flex:1;min-width:0}
+.inventory button{white-space:nowrap}
+.item-list{display:flex;flex-direction:column;gap:5px}
+.item-row{display:flex;align-items:center;gap:7px;font-size:13px;padding:6px 7px;background:#f8fafc;border-radius:8px}
+.item-row span{flex:1;overflow-wrap:anywhere}
+.item-row button{border:0;background:transparent;color:var(--red);font-size:16px}
+.timer{border:1px solid var(--line);border-radius:10px;padding:9px;margin:7px 0}
+.timer-top{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:13px}
+.timer-time{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;margin:6px 0}
+.timer.done{border-color:#fca5a5;background:#fff7f7}
+.timer small{color:var(--muted)}
+.status{font-size:12px;color:var(--green);font-weight:650}
+.notice{padding:10px 12px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.5;margin-top:10px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#20242b;color:white;padding:10px 15px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}
+#toast.show{opacity:1}
+.hidden{display:none!important}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:grid;place-items:center;z-index:20;padding:16px}
+.modal{width:min(440px,100%);background:white;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0003}
+.modal h2{margin:0 0 8px;font-size:18px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+svg text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:none;user-select:none}
+.room-shape{stroke:#526174;stroke-width:2;fill:#eaf1fb}
+.furniture-shape{stroke:#64748b;stroke-width:1.8;fill:#dce6f2}
+.entity.selected .main-shape{stroke:#2563eb;stroke-width:3}
+.marker-pin{fill:#f59e0b;stroke:#92400e;stroke-width:1.5}
+.resize-handle{fill:#2563eb;stroke:white;stroke-width:2;cursor:nwse-resize}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.app{padding:10px}.layout{display:flex;flex-direction:column}.side{display:flex;width:100%}header{align-items:flex-start;flex-direction:column}.header-actions{width:100%}.header-actions .btn{flex:1}#plan{min-height:390px}.toolbar{padding:10px}.canvas-foot{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">🏠</div>
+      <div><h1>우리집 플래너</h1><div class="subtitle">집의 구조와 물건, 메모와 생활 타이머를 한곳에서 관리해요.</div></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="soundBtn">🔔 소리 켜기</button>
+      <button class="btn" id="exportBtn">백업 저장</button>
+      <button class="btn" id="importBtn">백업 불러오기</button>
+      <input id="importFile" type="file" accept=".json,application/json" class="hidden">
+      <button class="btn primary" id="saveBtn">✓ 저장</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="panel editor">
+      <div class="toolbar">
+        <div class="toolgroup">
+          <span class="tool-label">공간</span>
+          <button class="btn small active" data-mode="select">↖ 선택 / 이동</button>
+          <button class="btn small" data-mode="room">＋ 방 추가</button>
+          <button class="btn small" data-mode="marker">📍 메모 표시</button>
+        </div>
+        <div style="width:1px;height:27px;background:var(--line)"></div>
+        <div class="toolgroup">
+          <span class="tool-label">가구</span>
+          <select id="furnitureSelect" style="width:auto;max-width:190px;padding:7px 9px;font-size:12px">
+            <option value="table">테이블</option><option value="chair">의자</option>
+            <option value="bed">침대</option><option value="closet">옷장</option>
+            <option value="fridge">냉장고</option><option value="washer">세탁기</option>
+            <option value="stove">가스레인지</option><option value="sofa">소파</option>
+            <option value="sink">싱크대</option><option value="shelf">선반</option>
+          </select>
+          <button class="btn small" id="addFurniture">＋ 배치</button>
+        </div>
+        <div style="margin-left:auto"><button class="btn small" id="deleteSelected">선택 항목 삭제</button></div>
+      </div>
+      <div class="canvas-wrap">
+        <svg id="plan" viewBox="0 0 1000 700" role="img" aria-label="집 평면도 편집 화면">
+          <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e9edf3" stroke-width="1"/></pattern></defs>
+          <rect width="1000" height="700" fill="url(#grid)"/>
+          <g id="scene"></g>
+        </svg>
+      </div>
+      <div class="canvas-foot"><span id="modeHint">선택한 방이나 가구를 끌어서 이동할 수 있어요. 모서리 점으로 크기를 바꿔보세요.</span><span id="saveStatus">자동 저장 준비됨</span></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel card">
+        <h2>선택한 항목</h2>
+        <div id="selectionEmpty" class="empty">평면도에서 방이나 가구를 선택하면 여기에서 이름과 크기를 바꿀 수 있어요.</div>
+        <div id="selectionForm" class="hidden">
+          <div class="field"><label for="itemName">이름</label><input id="itemName" maxlength="40"></div>
+          <div class="row">
+            <div class="field"><label for="itemWidth">가로 (m)</label><input id="itemWidth" type="number" min="0.25" max="12" step="0.25"></div>
+            <div class="field"><label for="itemHeight">세로 (m)</label><input id="itemHeight" type="number" min="0.25" max="12" step="0.25"></div>
+          </div>
+          <div class="help" id="dimensionHelp">모서리를 끌거나 숫자를 입력해 크기를 바꿀 수 있어요.</div>
+          <div id="fridgeSection" class="hidden">
+            <h3>🧊 냉장고 속 물건</h3>
+            <div class="inventory"><input id="newFood" placeholder="예: 우유, 달걀"><button class="btn small primary" id="addFood">추가</button></div>
+            <div id="foodList" class="item-list"></div>
+          </div>
+          <div style="margin-top:12px"><button class="btn danger small" id="deleteFromForm">이 항목 삭제</button></div>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <h2>📍 위치 메모</h2>
+        <div id="markerEmpty" class="empty">위쪽의 '메모 표시'를 누른 다음 평면도에서 위치를 선택해 보세요.</div>
+        <div id="markerForm" class="hidden">
+          <div class="field"><label for="markerTitle">메모 제목</label><input id="markerTitle" maxlength="50" placeholder="예: 수도 밸브 위치"></div>
+          <div class="field"><label for="markerNote">메모 내용</label><textarea id="markerNote" placeholder="이 위치에 대한 설명을 적어주세요."></textarea></div>
+          <button class="btn danger small" id="deleteMarker">메모 삭제</button>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <h2>⏱ 생활 타이머</h2>
+        <div class="row">
+          <div class="field"><label for="timerPreset">빠른 타이머</label>
+            <select id="timerPreset">
+              <option value="laundry">세탁기 · 45분</option>
+              <option value="stove">가스레인지 · 10분</option>
+              <option value="oven">오븐 · 20분</option>
+              <option value="tea">차 · 3분</option>
+              <option value="custom">직접 설정</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label for="timerName">타이머 이름</label><input id="timerName" value="세탁기"></div>
+        <div class="row">
+          <div class="field"><label for="timerMinutes">분</label><input id="timerMinutes" type="number" min="0" max="999" value="45"></div>
+          <div class="field"><label for="timerSeconds">초</label><input id="timerSeconds" type="number" min="0" max="59" value="0"></div>
+        </div>
+        <div class="field"><label for="timerLocation">위치 (선택)</label><select id="timerLocation"><option value="">위치 지정 안 함</option></select></div>
+        <button class="btn primary" id="startTimer" style="width:100%">타이머 시작</button>
+        <div id="timerList" style="margin-top:9px"></div>
+        <div class="notice">타이머 알림은 웹사이트가 열려 있을 때 작동합니다. 기기가 절전 모드이거나 브라우저가 알림을 제한하면 늦어질 수 있어요. 조리 안전을 위한 유일한 타이머로 사용하지 마세요.</div>
+      </section>
+
+      <section class="panel card">
+        <h2>집 구성</h2>
+        <div class="help" style="margin-bottom:9px">방과 가구를 빠르게 확인할 수 있어요.</div>
+        <div id="objectList" class="object-list"></div>
+      </section>
+    </aside>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="markerModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>위치 메모 추가</h2>
+    <p class="help">선택한 위치에 표시할 메모를 작성하세요.</p>
+    <div class="field"><label for="quickMarkerTitle">제목</label><input id="quickMarkerTitle" placeholder="예: 전기 차단기"></div>
+    <div class="field"><label for="quickMarkerNote">내용</label><textarea id="quickMarkerNote" placeholder="위치나 사용 방법을 적어주세요."></textarea></div>
+    <div class="modal-actions"><button class="btn" id="cancelMarker">취소</button><button class="btn primary" id="confirmMarker">메모 추가</button></div>
+  </div>
+</div>
+<script>
+(() => {
+"use strict";
+const STORAGE_KEY = "house-planner-v1";
+const SCALE = 80; // SVG pixels per metre
+const GRID = 20;
+const $ = id => document.getElementById(id);
+const uid = () => "id-" + Math.random().toString(36).slice(2,10);
+const defaults = {
+  rooms: [{id:uid(),type:"room",name:"거실",x:100,y:100,w:400,h:280,fill:"#eaf1fb"}],
+  objects: [],
+  markers: [],
+  inventory: {},
+  timers: []
+};
+let data = loadData();
+let selectedId = null, selectedType = null, mode = "select";
+let pendingMarker = null, soundEnabled = false, audioCtx = null;
+let drag = null, lastAlarmCheck = Date.now();
+
+function loadData(){
+  try { const raw=localStorage.getItem(STORAGE_KEY); if(raw){const d=JSON.parse(raw); if(d && Array.isArray(d.rooms)&&Array.isArray(d.objects)&&Array.isArray(d.markers)) return {...defaults,...d};} } catch(e){}
+  return structuredClone(defaults);
+}
+function saveData(show=true){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));$("saveStatus").textContent="저장됨 · "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});if(show)toast("이 브라우저에 저장했어요.");}
+  catch(e){toast("저장 공간이 부족해요. 백업을 내려받아 주세요.");}
+}
+let saveDebounce;
+function scheduleSave(){clearTimeout(saveDebounce);saveDebounce=setTimeout(()=>saveData(false),350);}
+function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200);}
+function allItems(){return [...data.rooms,...data.objects];}
+function findItem(id){return allItems().find(x=>x.id===id);}
+function findMarker(id){return data.markers.find(x=>x.id===id);}
+function snap(v){return Math.max(0,Math.round(v/GRID)*GRID);}
+function clamp(v,min,max){return Math.min(max,Math.max(min,v));}
+function svgPoint(evt){
+  const svg=$("plan"), p=svg.createSVGPoint();p.x=evt.clientX;p.y=evt.clientY;
+  const m=svg.getScreenCTM().inverse();const q=p.matrixTransform(m);return {x:q.x,y:q.y};
+}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function typeLabel(t){return ({table:"테이블",chair:"의자",bed:"침대",closet:"옷장",fridge:"냉장고",washer:"세탁기",stove:"가스레인지",sofa:"소파",sink:"싱크대",shelf:"선반",room:"방"})[t]||t;}
+function render(){
+  const scene=$("scene");let out="";
+  for(const r of data.rooms){
+    const sel=selectedId===r.id;
+    out+=`<g class="entity ${sel?"selected":""}" data-id="${r.id}" data-kind="room">
+      <rect class="main-shape room-shape" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="5" fill="${r.fill||"#eaf1fb"}"/>
+      <text x="${r.x+r.w/2}" y="${r.y+r.h/2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="700" fill="#334155">${esc(r.name)}</text>
+      ${sel?resizeHandle(r):""}</g>`;
+  }
+  for(const o of data.objects){
+    const sel=selectedId===o.id, icon=({table:"▤",chair:"▥",bed:"▱",closet:"▥",fridge:"▯",washer:"◉",stove:"⌗",sofa:"▰",sink:"▱",shelf:"▤"})[o.type]||"▪";
+    out+=`<g class="entity ${sel?"selected":""}" data-id="${o.id}" data-kind="object">
+      <rect class="main-shape furniture-shape" x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="5" fill="${o.fill||"#dce6f2"}"/>
+      <text x="${o.x+o.w/2}" y="${o.y+o.h/2-5}" text-anchor="middle" dominant-baseline="middle" font-size="${Math.min(23,Math.max(13,o.h*.28))}" fill="#475569">${icon}</text>
+      <text x="${o.x+o.w/2}" y="${o.y+o.h/2+15}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="650" fill="#334155">${esc(o.name)}</text>
+      ${sel?resizeHandle(o):""}</g>`;
+  }
+  for(const m of data.markers){
+    const sel=selectedId===m.id;
+    out+=`<g class="marker-group" data-id="${m.id}" data-kind="marker" style="cursor:pointer">
+      <circle class="marker-pin" cx="${m.x}" cy="${m.y}" r="${sel?15:12}"/>
+      <text x="${m.x}" y="${m.y+1}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="800" fill="#fff">!</text>
+      <text x="${m.x+17}" y="${m.y-14}" font-size="13" font-weight="700" fill="#92400e">${esc(m.title||"메모")}</text>
+    </g>`;
+  }
+  scene.innerHTML=out;
+  updateSide();
+}
+function resizeHandle(o){return `<rect class="resize-handle" data-resize="1" x="${o.x+o.w-7}" y="${o.y+o.h-7}" width="14" height="14" rx="3"/>`;}
+function setMode(m){
+  mode=m;document.querySelectorAll("[data-mode]").forEach(b=>b.classList.toggle("active",b.dataset.mode===m));
+  $("modeHint").textContent=m==="room"?"평면도의 빈 곳을 눌러 새 방을 배치하세요.":"";
+  if(m==="select")$("modeHint").textContent="방이나 가구를 끌어서 이동하고, 오른쪽 아래 파란 점으로 크기를 바꾸세요.";
+  if(m==="marker")$("modeHint").textContent="평면도에서 메모를 남길 위치를 눌러주세요.";
+  $("plan").style.cursor=m==="select"?"default":"crosshair";
+}
+function updateSide(){
+  const item=findItem(selectedId);
+  $("selectionEmpty").classList.toggle("hidden",!!item);
+  $("selectionForm").classList.toggle("hidden",!item);
+  if(item){
+    $("itemName").value=item.name||"";
+    $("itemWidth").value=(item.w/SCALE).toFixed(2).replace(/0+$/,"").replace(/\.$/,"");
+    $("itemHeight").value=(item.h/SCALE).toFixed(2).replace(/0+$/,"").replace(/\.$/,"");
+    $("fridgeSection").classList.toggle("hidden",item.type!=="fridge");
+    if(item.type==="fridge")renderInventory();
+  }
+  const marker=findMarker(selectedId);
+  $("markerEmpty").classList.toggle("hidden",!!marker);
+  $("markerForm").classList.toggle("hidden",!marker);
+  if(marker){$("markerTitle").value=marker.title||"";$("markerNote").value=marker.note||"";}
+  renderObjectList();updateTimerLocations();
+}
+function renderObjectList(){
+  const arr=allItems();$("objectList").innerHTML=arr.length?arr.map(o=>`<div class="object-item"><span>${o.type==="room"?"🏠":"▦"} ${esc(o.name)}</span><button data-jump="${o.id}">선택</button></div>`).join(""):`<div class="empty">아직 방이나 가구가 없어요.</div>`;
+}
+function renderInventory(){
+  const item=findItem(selectedId);if(!item||item.type!=="fridge")return;
+  const list=data.inventory[item.id]||[];
+  $("foodList").innerHTML=list.length?list.map((v,i)=>`<div class="item-row"><span>${esc(v)}</span><button data-food-remove="${i}" title="삭제">×</button></div>`).join(""):`<div class="help">냉장고가 비어 있어요. 물건을 추가해 보세요.</div>`;
+}
+function updateTimerLocations(){
+  const sel=$("timerLocation"), old=sel.value;
+  sel.innerHTML='<option value="">위치 지정 안 함</option>'+allItems().map(o=>`<option value="${o.id}">${esc(o.name)} (${typeLabel(o.type)})</option>`).join("");
+  if([...sel.options].some(o=>o.value===old))sel.value=old;
+}
+function addRoom(x,y){
+  const r={id:uid(),type:"room",name:"새 방",x:snap(x),y:snap(y),w:320,h:240,fill:"#eaf1fb"};
+  data.rooms.push(r);selectedId=r.id;selectedType="room";scheduleSave();render();toast("새 방을 추가했어요.");
+}
+const presets={
+ table:{name:"테이블",w:120,h:80,fill:"#dce6f2"},chair:{name:"의자",w:48,h:48,fill:"#e2e8f0"},
+ bed:{name:"침대",w:160,h:200,fill:"#dbeafe"},closet:{name:"옷장",w:120,h:60,fill:"#e7e5e4"},
+ fridge:{name:"냉장고",w:60,h:70,fill:"#dbeafe"},washer:{name:"세탁기",w:60,h:60,fill:"#e2e8f0"},
+ stove:{name:"가스레인지",w:80,h:60,fill:"#fee2e2"},sofa:{name:"소파",w:160,h:70,fill:"#e9d5ff"},
+ sink:{name:"싱크대",w:140,h:60,fill:"#ccfbf1"},shelf:{name:"선반",w:100,h:45,fill:"#fef3c7"}
+};
+function addFurniture(type,x=470,y=360){
+  const p=presets[type],o={id:uid(),type,name:p.name,x:snap(x),y:snap(y),w:p.w,h:p.h,fill:p.fill};
+  data.objects.push(o);if(type==="fridge")data.inventory[o.id]=[];
+  selectedId=o.id;selectedType="object";scheduleSave();render();toast(p.name+" 배치 완료");
+}
+function deleteSelected(){
+  if(data.rooms.some(x=>x.id===selectedId))data.rooms=data.rooms.filter(x=>x.id!==selectedId);
+  else if(data.objects.some(x=>x.id===selectedId)){delete data.inventory[selectedId];data.objects=data.objects.filter(x=>x.id!==selectedId);}
+  else data.markers=data.markers.filter(x=>x.id!==selectedId);
+  selectedId=null;scheduleSave();render();toast("선택 항목을 삭제했어요.");
+}
+function pointerDown(e){
+  const target=e.target.closest("[data-id]");
+  const pt=svgPoint(e);
+  if(mode==="room"){addRoom(pt.x-160,pt.y-120);setMode("select");return;}
+  if(mode==="marker"){pendingMarker=pt;$("markerModal").classList.remove("hidden");$("quickMarkerTitle").value="";$("quickMarkerNote").value="";return;}
+  if(!target){selectedId=null;render();return;}
+  const id=target.dataset.id,kind=target.dataset.kind;
+  if(kind==="marker"){selectedId=id;selectedType="marker";render();return;}
+  selectedId=id;selectedType=kind;
+  const item=findItem(id);
+  const resizing=!!e.target.closest("[data-resize]");
+  drag={id,kind,start:pt,orig:{x:item.x,y:item.y,w:item.w,h:item.h},resizing};
+  $("plan").setPointerCapture?.(e.pointerId);
+  render();
+}
+function pointerMove(e){
+  if(!drag)return;
+  const pt=svgPoint(e),dx=pt.x-drag.start.x,dy=pt.y-drag.start.y,item=findItem(drag.id);
+  if(!item)return;
+  if(drag.resizing){item.w=clamp(snap(drag.orig.w+dx),GRID,900);item.h=clamp(snap(drag.orig.h+dy),GRID,620);}
+  else{item.x=clamp(snap(drag.orig.x+dx),0,980-item.w);item.y=clamp(snap(drag.orig.y+dy),0,680-item.h);}
+  render();
+}
+function pointerUp(){if(drag){drag=null;scheduleSave();}}
+$("plan").addEventListener("pointerdown",pointerDown);
+$("plan").addEventListener("pointermove",pointerMove);
+$("plan").addEventListener("pointerup",pointerUp);
+$("plan").addEventListener("pointercancel",pointerUp);
+document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.mode)));
+$("addFurniture").addEventListener("click",()=>addFurniture($("furnitureSelect").value));
+$("deleteSelected").addEventListener("click",deleteSelected);
+$("deleteFromForm").addEventListener("click",deleteSelected);
+$("itemName").addEventListener("input",e=>{const o=findItem(selectedId);if(o){o.name=e.target.value;renderSceneOnly();scheduleSave();}});
+function updateDimension(which,val){
+  const o=findItem(selectedId);if(!o)return;
+  const n=clamp(Number(val)||.25,.25,12)*SCALE;
+  o[which]=snap(n);render();scheduleSave();
+}
+$("itemWidth").addEventListener("change",e=>updateDimension("w",e.target.value));
+$("itemHeight").addEventListener("change",e=>updateDimension("h",e.target.value));
+function renderSceneOnly(){
+  const old=selectedId;render();selectedId=old;
+}
+$("scene").addEventListener("click",e=>{
+  const b=e.target.closest("[data-jump]");if(b){selectedId=b.dataset.jump;render();}
+});
+$("objectList").addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(b){selectedId=b.dataset.jump;render();}});
+$("addFood").addEventListener("click",()=>{
+  const o=findItem(selectedId),v=$("newFood").value.trim();if(!o||o.type!=="fridge"||!v)return;
+  (data.inventory[o.id]??=[]).push(v);$("newFood").value="";renderInventory();scheduleSave();
+});
+$("foodList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-food-remove]");if(!b)return;
+  data.inventory[selectedId].splice(Number(b.dataset.foodRemove),1);renderInventory();scheduleSave();
+});
+$("markerTitle").addEventListener("input",e=>{const m=findMarker(selectedId);if(m){m.title=e.target.value;renderSceneOnly();scheduleSave();}});
+$("markerNote").addEventListener("input",e=>{const m=findMarker(selectedId);if(m){m.note=e.target.value;scheduleSave();}});
+$("cancelMarker").addEventListener("click",()=>{$("markerModal").classList.add("hidden");pendingMarker=null;});
+$("confirmMarker").addEventListener("click",()=>{
+  if(!pendingMarker)return;
+  const m={id:uid(),x:snap(pendingMarker.x),y:snap(pendingMarker.y),title:$("quickMarkerTitle").value.trim()||"새 메모",note:$("quickMarkerNote").value.trim()};
+  data.markers.push(m);selectedId=m.id;selectedType="marker";pendingMarker=null;$("markerModal").classList.add("hidden");scheduleSave();render();
+});
+$("deleteMarker").addEventListener("click",deleteSelected);
+
+$("timerPreset").addEventListener("change",()=>{
+  const v=$("timerPreset").value;
+  const p={laundry:["세탁기",45,0],stove:["가스레인지",10,0],oven:["오븐",20,0],tea:["차",3,0],custom:["직접 설정",5,0]}[v];
+  $("timerName").value=p[0];$("timerMinutes").value=p[1];$("timerSeconds").value=p[2];
+});
+function startTimer(){
+  const name=$("timerName").value.trim()||"타이머";
+  const secs=Math.max(1,Math.min(999*60+59,(Number($("timerMinutes").value)||0)*60+(Number($("timerSeconds").value)||0)));
+  const timer={id:uid(),name,location:$("timerLocation").value,endsAt:Date.now()+secs*1000,duration:secs,done:false,alerted:false};
+  data.timers.push(timer);scheduleSave();renderTimers();toast(name+" 타이머를 시작했어요.");
+}
+$("startTimer").addEventListener("click",startTimer);
+$("timerList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-timer-action]");if(!b)return;
+  const t=data.timers.find(x=>x.id===b.dataset.id);if(!t)return;
+  if(b.dataset.timerAction==="delete")data.timers=data.timers.filter(x=>x.id!==t.id);
+  if(b.dataset.timerAction==="stop"){t.done=true;t.alerted=true;}
+  scheduleSave();renderTimers();
+});
+function fmt(sec){sec=Math.max(0,Math.ceil(sec));return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");}
+function renderTimers(){
+  const el=$("timerList");
+  if(!data.timers.length){el.innerHTML='<div class="empty">실행 중인 타이머가 여기에 표시돼요.</div>';return;}
+  el.innerHTML=data.timers.map(t=>{
+    const remaining=t.done?0:Math.max(0,Math.ceil((t.endsAt-Date.now())/1000));
+    const loc=allItems().find(o=>o.id===t.location);
+    return `<div class="timer ${t.done||remaining===0?"done":""}">
+      <div class="timer-top"><span>${esc(t.name)}</span><button class="btn small" data-timer-action="delete" data-id="${t.id}">삭제</button></div>
+      <div class="timer-time">${t.done?"중지됨":remaining===0?"시간 종료":fmt(remaining)}</div>
+      <small>${loc?"📍 "+esc(loc.name):"위치 미지정"}</small>
+      ${!t.done&&remaining>0?`<div style="margin-top:7px"><button class="btn small" data-timer-action="stop" data-id="${t.id}">중지</button></div>`:""}
+    </div>`;
+  }).join("");
+}
+function enableSound(){
+  try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();audioCtx.resume();soundEnabled=true;$("soundBtn").textContent="🔔 소리 켜짐";$("soundBtn").classList.add("active");toast("알림 소리를 사용할 수 있어요.");}
+  catch(e){toast("이 브라우저에서는 소리를 켤 수 없어요.");}
+}
+function beep(){
+  if(!soundEnabled||!audioCtx)return;
+  try{
+    const now=audioCtx.currentTime;
+    [0,0.28,0.56].forEach((offset)=>{
+      const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+      osc.type="sine";osc.frequency.value=880;
+      gain.gain.setValueAtTime(.0001,now+offset);
+      gain.gain.exponentialRampToValueAtTime(.22,now+offset+.02);
+      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.2);
+      osc.connect(gain);gain.connect(audioCtx.destination);osc.start(now+offset);osc.stop(now+offset+.22);
+    });
+  }catch(e){}
+}
+$("soundBtn").addEventListener("click",enableSound);
+function tick(){
+  let changed=false;
+  for(const t of data.timers){
+    if(!t.done&&!t.alerted&&Date.now()>=t.endsAt){
+      t.alerted=true;changed=true;beep();toast("⏰ "+t.name+" 타이머가 끝났어요!");
+    }
+  }
+  if(changed)scheduleSave();
+  renderTimers();
+}
+$("saveBtn").addEventListener("click",()=>saveData(true));
+$("exportBtn").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="my-house-backup.json";a.click();URL.revokeObjectURL(url);toast("백업 파일을 만들었어요.");
+});
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!Array.isArray(d.rooms)||!Array.isArray(d.objects)||!Array.isArray(d.markers))throw new Error("invalid");
+    data={...defaults,...d};selectedId=null;saveData(false);render();toast("백업을 불러왔어요.");
+  }catch(err){toast("올바른 백업 파일이 아니에요.");}
+  e.target.value="";
+});
+window.addEventListener("beforeunload",()=>saveData(false));
+render();setMode("select");renderTimers();setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>
